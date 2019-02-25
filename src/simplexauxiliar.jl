@@ -20,7 +20,7 @@ function getAcol!(l::Vector{Float64}, A::SparseMatrixCSC{Float64,Int64},
                   col::Int64, Irows::Vector{Int64})
   l .= 0.; j = 0
   for i in nzrange(A,col)
-    j = findfirst(Irows,A.rowval[i])
+    j = something(findfirst(isequal(A.rowval[i]), Irows), 0) # findfirst(Irows,A.rowval[i])
     if j != 0
       l[j] = A.nzval[i]
     end
@@ -44,8 +44,8 @@ end
 # returns l[perm] without allocating unnecessary memory
 # returns l[invperm(perm)] if inv = true
 function savepermute!(tempperm, perm, l, inv::Bool = false)
-  copy!(tempperm, perm)
-  !inv ? permute!!(l, tempperm) : ipermute!!(l, tempperm)
+  copyto!(tempperm, perm)
+  !inv ? permute!!(l, tempperm) : invpermute!(l, tempperm)
 end
 
 function shiftN!(N, q, backwards = false)
@@ -99,7 +99,7 @@ function insertAcol!(A::SparseMatrixCSC{Float64,Int64},a::Vector{Float64},p::Int
   for i in nzrange(A,p)
     A.nzval[i] = 0.
   end
-  for i in find(a)
+  for i in findall(a.!=0)
     A[i,p] = a[i]
   end
 end
