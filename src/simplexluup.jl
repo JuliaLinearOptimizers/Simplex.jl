@@ -55,7 +55,7 @@ function simplexluup(c::Vector{Float64}, A::SparseMatrixCSC{Float64,Int64}, b::V
   status = :Optimal
 
   # simplex search
-  while !(q == 0 || iter > max_iter)
+  while !(q == nothing || iter > max_iter)
 
       iter += 1
       getAcol!(w,A,ℕ[q])

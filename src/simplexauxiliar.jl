@@ -79,7 +79,7 @@ end
 # Bland's Rule: determine elements of r = c[N] - (l'*A[:,N])' one by one,
 # q will be the first s.t. r[q] < -ϵ
 function getq(c::Vector{Float64}, λ::Vector{Float64},
-              A::SparseMatrixCSC{Float64,Int64}, N::Vector{Int64}, ϵ::Float64)
+              A::SparseMatrixCSC{Float64,Int64}, N::Vector{Int64}, ϵ::Float64 = eps(Float64))
   for (colN,colA) in enumerate(N)
     rq = c[colA]
     for i in nzrange(A,colA)
@@ -91,7 +91,7 @@ function getq(c::Vector{Float64}, λ::Vector{Float64},
       return colN
     end
   end
-  return 0
+  return nothing
 end
 
 # does A[:,p] .= a without allocating much memory
