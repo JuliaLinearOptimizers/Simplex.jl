@@ -1,5 +1,7 @@
 module Simplex
-using Base.SparseArrays.halfperm!, Base.SparseArrays.increment!, Base.permute!!, Base.ipermute!!
+
+using LinearAlgebra, SparseArrays
+import SparseArrays.halfperm!, Base.permute!!
 include("simplexauxiliar.jl")
 include("simplexluup.jl")
 include("simplexinv.jl")

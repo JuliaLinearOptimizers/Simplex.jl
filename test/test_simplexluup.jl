@@ -61,20 +61,23 @@ end
 test_simplexluup()
 
 function test_transpluup()
-  srand(1)
   @testset "Transport tests" begin
-    @testset "scale $scale_m × $scale_n" for scale_m = 10.^(0:1), scale_n = 10.^(0:1)
-      for t = 1:10
-        m, n = scale_m * rand(2:5), scale_n * rand(2:5)
+    @testset "scale $scale_m × $scale_n" for scale_m = 10 .^(0:1), scale_n = 10 .^(0:1)
+      for t = collect(1:10)
+        m, n = scale_m * rand(2:4), scale_n * rand(2:4)
         A, b, c = transport_instance(m, n)
 
-        model = Model(solver = GLPKSolverLP())
+        model = Model(with_optimizer(GLPK.Optimizer))
         @variable(model, x[1:m*n] >= 0)
         @objective(model, Min, dot(x, c))
         @constraint(model, A * x .== b)
-        status = solve(model)
-        xj = getvalue(x)
-        zj = getobjectivevalue(model)
+        optimize!(model)
+        status = termination_status(model)
+        xj = Vector{Float64}(undef,m*n)
+        for i in 1:m*n
+          xj[i] = value(x[i])
+        end
+        zj = objective_value(model)
 
         x, z, status = simplexluup(c, A, b, max_iter = 1000 * scale_m * scale_n)
         Δz = dot(c, x) - zj

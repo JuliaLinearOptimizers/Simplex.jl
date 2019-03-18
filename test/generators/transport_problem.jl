@@ -18,7 +18,9 @@ function transport_instance(m, n)
 
   A = spzeros(m + n, m * n)
   for i = 1:m # Sum of resources leaving from each starting point
-    A[i, (i - 1) * n + 1 : i * n] = 1
+    for j in (i - 1)*n + 1 : i*n
+      A[i, j] = 1
+    end
   end
 
   for i = 1:n # Sum of resources arriving to each end point
