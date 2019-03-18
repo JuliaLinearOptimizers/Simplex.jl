@@ -64,7 +64,7 @@ function test_transpluup()
   @testset "Transport tests" begin
     @testset "scale $scale_m × $scale_n" for scale_m = 10 .^(0:1), scale_n = 10 .^(0:1)
       for t = collect(1:10)
-        m, n = scale_m * rand(2:5), scale_n * rand(2:5)
+        m, n = scale_m * rand(2:4), scale_n * rand(2:4)
         A, b, c = transport_instance(m, n)
 
         model = Model(with_optimizer(GLPK.Optimizer))
