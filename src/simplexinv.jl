@@ -1,15 +1,16 @@
 export simplexinv
 
-function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
+function simplexinv(c, A, b, 𝔹=Int[], E = Float64[], ups = 0; max_iter = 20000)
   m, n = size(A)
   iter = 0
-  λ = Array{Float64,1}(undef, m); d = Array{Float64,1}(undef, m)
-  if 𝔹 == 0 # construct artificial problem
+  λ = Array{Float64, 1}(undef, m)
+  d = Array{Float64, 1}(undef, m)
+  if 𝔹 == Int[] # construct artificial problem
     artificial = true
     signb = sign.(b)
-    A = [A sparse(Diagonal(signb))]
-    𝔹 = collect(n+1:n+m) # indexes of basic variables
-    ℕ = collect(1:n)
+    A = [A spdiagm(0 => signb)]
+    𝔹 = collect(n+1 : n+m) # indexes of basic variables
+    ℕ = collect(1 : n)
     co = copy(c)
     c = [zeros(n); ones(m)]
     E = zeros(A.m + 1, 3*A.m)
@@ -22,14 +23,14 @@ function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
     xB = abs.(b) # solution in current basis
   else
     artificial = false
-    if E == 0
+    if E == Float64[]
       E = zeros(A.m + 1, 3*A.m)
       getPFI!(A, 𝔹, E); ups = A.m
     end
-    ℕ = setdiff(1:n, 𝔹)
+    ℕ = setdiff(1 : n, 𝔹)
     xB = copy(b); solvePFI!(xB, E, ups)
   end
-  getλ!(λ,c,𝔹)
+  getλ!(λ, c, 𝔹)
   solvePFI!(λ, E, ups, true)
   q = getq(c, λ, A, ℕ)
 
@@ -37,11 +38,11 @@ function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
 
   while !(q == nothing || iter >= max_iter) # relative variable changes to direction
     iter += 1
-    getAcol!(d,A,ℕ[q])
+    getAcol!(d, A, ℕ[q])
     solvePFI!(d, E, ups)
 
     xq = Inf
-    for k in 1:m # find min xB/d such that d .> 0
+    for k in 1 : m # find min xB/d such that d .> 0
       if d[k] >= eps(Float64)
         dfrac = xB[k]/d[k]
         if dfrac < xq
@@ -84,21 +85,21 @@ function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
       x[𝔹[I]] = xB[I]
       z = dot(c[𝔹], x)
     elseif maximum(𝔹) > n # check for artificial variables in basis
-      ℕ = setdiff(ℕ,n+1:n+m)
-      Irows = collect(1:m)
+      ℕ = setdiff(ℕ, n+1 : n+m)
+      Irows = collect(1 : m)
       p, pind = findmax(𝔹)
       Ap = Array{Float64, 1}(undef, m)
       while p > n
         q = 1
-        getAcol!(Ap,A,p,Irows)
+        getAcol!(Ap, A, p, Irows)
         PivotAp = findfirst(Ap .!= 0) #findfirst(Ap)
         while q <= length(ℕ)
-          getAcol!(d,A,ℕ[q],Irows)
+          getAcol!(d, A, ℕ[q], Irows)
           solvePFI!(d, E, ups)
           (abs(d[PivotAp]) >= eps(Float64)) ? break : q += 1
         end
         if q > length(ℕ)
-          deleteat!(Irows, findfirst(A[Irows,p] .!= 0))
+          deleteat!(Irows, findfirst(A[Irows, p] .!= 0))
           deleteat!(𝔹, pind); deleteat!(xB, pind)
           deleteat!(Ap, pind); deleteat!(d, pind)
           E = zeros(length(Irows) + 1, 3*length(Irows))
@@ -118,9 +119,9 @@ function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
         end
         p, pind = findmax(𝔹)
       end
-      x, z, status = simplexinv(co, A[Irows,1:n], b[Irows], 𝔹, E, ups)
+      x, z, status = simplexinv(co, A[Irows, 1 : n], b[Irows], 𝔹, E, ups)
     else
-      x, z, status = simplexinv(co, A[:,1:n], b, 𝔹, E, ups)
+      x, z, status = simplexinv(co, A[:, 1 : n], b, 𝔹, E, ups)
     end
   end
   return x, z, status
