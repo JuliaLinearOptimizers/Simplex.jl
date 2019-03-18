@@ -94,12 +94,75 @@ function getq(c::Vector{Float64}, λ::Vector{Float64},
   return nothing
 end
 
-# does A[:,p] .= a without allocating much memory
+# does A[:,p] .= a without allocating extra memory
 function insertAcol!(A::SparseMatrixCSC{Float64,Int64},a::Vector{Float64},p::Int64)
   for i in nzrange(A,p)
     A.nzval[i] = 0.
   end
   for i in findall(a.!=0)
     A[i,p] = a[i]
+  end
+end
+
+# equivalent to d = invB*d
+function solvePFI!(d, E, ups, transp = false)
+  if !transp
+    for i in 1:ups
+      temp = d[Int(E[end, i])]
+      for k in 1:length(d)
+        d[k] -= temp*E[k,i]
+      end
+      d[Int(E[end, i])] = temp*E[Int(E[end, i]), i]
+    end
+  else
+    for i in 1:ups
+      temp = 0
+      indi = ups - i + 1
+      for j in 1:length(d)
+        temp -= d[j]*E[j, indi]
+      end
+      d[Int(E[end, indi])] = temp + 2*d[Int(E[end, indi])]*E[Int(E[end, indi]), indi]
+    end
+  end
+end
+
+# updates the PFI with the insertion of d in column p
+function updatePFI!(E, d, p, ups)
+    for (i, j) in enumerate(d)
+      E[i, ups + 1] = j/d[p]
+    end
+    E[p, ups + 1] /= d[p]
+    E[end, ups + 1] = p
+end
+
+# find E such that inv(A[:,B])*d ~ solvePFI(d, E, ups)
+function getPFI!(A, B, E)
+  m = length(B)
+  E[1:m,1:m] = A[:,B]
+  for i in 1:m
+    for j in i:m
+      if abs(E[i, j]) > eps(Float64)
+        E[end, j] = i
+        if j != i
+          B[j], B[i] = B[i], B[j] # reorder basis
+          for k in 1:m+1
+            temp = E[k,j]; E[k,j] = E[k,i]; E[k,i] = temp
+          end
+        end
+        temp = E[i,i]
+        for k in 1:m
+          E[k,i] /= temp
+        end
+        E[i,i] /= temp
+        for k in i+1:m # update remaining columns
+          temp = E[i, k]
+          for l in 1:m
+            E[l, k] -= temp*E[l, i]
+          end
+          E[i, k] = temp*E[i, i]
+        end
+        break
+      end
+    end
   end
 end

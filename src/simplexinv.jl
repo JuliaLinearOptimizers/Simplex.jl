@@ -1,6 +1,6 @@
 export simplexinv
 
-function simplexinv(c, A, b, 𝔹=0, invB=0; max_iter = 20000)
+function simplexinv(c, A, b, 𝔹=0, E = 0, ups = 0; max_iter = 20000)
   m, n = size(A)
   iter = 0
   λ = Array{Float64,1}(undef, m); d = Array{Float64,1}(undef, m)
@@ -12,27 +12,36 @@ function simplexinv(c, A, b, 𝔹=0, invB=0; max_iter = 20000)
     ℕ = collect(1:n)
     co = copy(c)
     c = [zeros(n); ones(m)]
-    invB = sparse(Diagonal(signb))
+    E = zeros(A.m + 1, 3*A.m)
+    for (i, j) in enumerate(b) # adjust for negative values in b
+      if j < 0
+        ups += 1
+        E[i, ups] = -1; E[end, ups] = i
+      end
+    end
     xB = abs.(b) # solution in current basis
   else
     artificial = false
-    if (invB == 0) invB = sparse(inv(Matrix(A[:,𝔹]))) end
+    if E == 0
+      E = zeros(A.m + 1, 3*A.m)
+      getPFI!(A, 𝔹, E); ups = A.m
+    end
     ℕ = setdiff(1:n, 𝔹)
-    xB = invB*b
+    xB = copy(b); solvePFI!(xB, E, ups)
   end
   getλ!(λ,c,𝔹)
-  λ = invB'*λ # FIX
+  solvePFI!(λ, E, ups, true)
   q = getq(c, λ, A, ℕ)
 
   status = :Optimal
 
-  while !(q == nothing || iter >= max_iter) # relative variable changes to directioner >= max_iter)
+  while !(q == nothing || iter >= max_iter) # relative variable changes to direction
     iter += 1
     getAcol!(d,A,ℕ[q])
-    d = invB * d # viable direction
+    solvePFI!(d, E, ups)
 
     xq = Inf
-    for k in 1:m # find min xB/d s.t. d .> 0
+    for k in 1:m # find min xB/d such that d .> 0
       if d[k] >= eps(Float64)
         dfrac = xB[k]/d[k]
         if dfrac < xq
@@ -45,17 +54,18 @@ function simplexinv(c, A, b, 𝔹=0, invB=0; max_iter = 20000)
       status = :Unbounded; break
     end
 
-    subdot!(xB,d,xq) # update solution
+    subdot!(xB, d, xq) # update solution
     xB[p] = xq
     𝔹[p], ℕ[q] = ℕ[q], 𝔹[p] # update indexes
-    #update of inverse of B
-    E = one(zeros(m,m))
-    dp = d[p]
-    d[p] = -1
-    E[:, p] = -d / dp
-    invB = E*invB # STOP THIS
-    getλ!(λ,c,𝔹)
-    λ = invB'*λ # FIX
+    # update of inverse of B
+    if ups < 3*A.m
+      updatePFI!(E, d, p, ups); ups += 1
+    else
+      getPFI!(A, 𝔹, E); ups = A.m
+      xB .= b; solvePFI!(xB, E, ups)
+    end
+    getλ!(λ, c, 𝔹)
+    solvePFI!(λ, E, ups, true)
     q = getq(c, λ, A, ℕ)
   end
 
@@ -68,7 +78,7 @@ function simplexinv(c, A, b, 𝔹=0, invB=0; max_iter = 20000)
     x[𝔹] = xB
     z = dot(c, x)
   else
-    if dot(xB, c[𝔹]) > eps(Float64)
+    if dot(xB, c[𝔹]) > 1e-6
       status = (iter >= max_iter) ? :UserLimit : :Infeasible
       I = findall(𝔹 .<= n - m)
       x[𝔹[I]] = xB[I]
@@ -84,29 +94,33 @@ function simplexinv(c, A, b, 𝔹=0, invB=0; max_iter = 20000)
         PivotAp = findfirst(Ap .!= 0) #findfirst(Ap)
         while q <= length(ℕ)
           getAcol!(d,A,ℕ[q],Irows)
-          d = invB * d
+          solvePFI!(d, E, ups)
           (abs(d[PivotAp]) >= eps(Float64)) ? break : q += 1
         end
         if q > length(ℕ)
           deleteat!(Irows, findfirst(A[Irows,p] .!= 0))
           deleteat!(𝔹, pind); deleteat!(xB, pind)
           deleteat!(Ap, pind); deleteat!(d, pind)
-          invB = sparse(inv(Matrix(A[Irows,𝔹])))
+          E = zeros(length(Irows) + 1, 3*length(Irows))
+          getPFI!(A[Irows, :], 𝔹, E); ups = length(Irows)
+          xB .= b[Irows]; solvePFI!(xB, E, ups)
         else
+          d = A[Irows, ℕ[q]]
+          solvePFI!(d, E, ups)
+          updatePFI!(E, d, p, ups); ups += 1
+          if ups < 3*length(Irows)
+            updatePFI!(E, d, p, ups); ups += 1
+          else
+            getPFI!(A[Irows, :], 𝔹, E); ups = length(Irows)
+          end
           𝔹[p] = ℕ[q]
           deleteat!(ℕ, q)
-          d = invB * A[Irows,ℕ[q]]
-          E = one(zeros(m,m))
-          dp = d[p]
-          d[p] = -1
-          E[:, p] = -d / dp
-          invB = E*invB # STOP THIS
         end
         p, pind = findmax(𝔹)
       end
-      x, z, status = simplexinv(co, A[Irows,1:n], b[Irows], 𝔹, invB)
+      x, z, status = simplexinv(co, A[Irows,1:n], b[Irows], 𝔹, E, ups)
     else
-      x, z, status = simplexinv(co, A[:,1:n], b, 𝔹, invB)
+      x, z, status = simplexinv(co, A[:,1:n], b, 𝔹, E, ups)
     end
   end
   return x, z, status
