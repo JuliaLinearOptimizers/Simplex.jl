@@ -1,4 +1,5 @@
-using Simplex, Test, JuMP, GLPK, Random, LinearAlgebra, SparseArrays
+using Simplex
+using Test
 
-include("test_simplexluup.jl")
-include("test_simplexinv.jl")
+include("problems/problems.jl")
+include("simple-problems.jl")
